@@ -14,6 +14,7 @@ def find_codex():
  mac='/Applications/ChatGPT.app/Contents/Resources/codex'
  return mac if Path(mac).exists() else 'codex'
 CODEX_BIN=find_codex()
+DEFAULT_CODEX_SOCKET=Path.home()/'.codex'/'app-server-control'/'app-server-control.sock'
 USE_OLLAMA=os.getenv('SUPERVISOR_USE_OLLAMA','0')=='1'
 state={'status':'DISCONNECTED','objective':'Select a Codex task to observe.','currentAction':'','progress':[],'filesChanged':[],'tests':'','lastSuccess':'','blocker':'','scopeDrift':'None','needsUser':'No','nextAction':'','assessment':'','steering':'','events':[],'threads':[],'connected':None,'observedName':'','observedPath':'','lastEvidence':'','lastInterpretation':'','lastAnalysisAt':''}
 lock=threading.Lock(); rpc_id=0
@@ -22,6 +23,16 @@ analysis_timer=None
 analysis_epoch=0
 watch_generation=0
 recent_event_keys=[]
+
+def codex_command():
+ mode=os.getenv('SUPERVISOR_CODEX_TRANSPORT','auto').lower()
+ configured_socket=os.getenv('SUPERVISOR_CODEX_SOCKET')
+ socket_path=Path(configured_socket).expanduser() if configured_socket else DEFAULT_CODEX_SOCKET
+ if mode=='stdio' or (mode=='auto' and not socket_path.exists()):
+  return [CODEX_BIN,'app-server','--stdio']
+ command=[CODEX_BIN,'app-server','proxy']
+ if configured_socket: command += ['--sock',str(socket_path)]
+ return command
 
 def compact_event(kind,detail):
  text=' '.join(str(detail).split())
@@ -39,11 +50,7 @@ def compact_event(kind,detail):
 
 class AppServer:
  def __init__(self):
-  mode=os.getenv('SUPERVISOR_CODEX_TRANSPORT','proxy')
-  command=[CODEX_BIN,'app-server','proxy'] if mode=='proxy' else [CODEX_BIN,'app-server','--stdio']
-  socket=os.getenv('SUPERVISOR_CODEX_SOCKET')
-  if mode=='proxy' and socket: command += ['--sock',socket]
-  self.p=subprocess.Popen(command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,text=True,bufsize=1)
+  self.p=subprocess.Popen(codex_command(),stdin=subprocess.PIPE,stdout=subprocess.PIPE,text=True,bufsize=1)
   self.pending={}; threading.Thread(target=self.read,daemon=True).start()
   self.call('initialize',{'clientInfo':{'name':'codex-supervisor','title':'CODEX SUPERVISOR','version':'0.1.0'},'capabilities':{}})
   self.send({'method':'initialized'})
