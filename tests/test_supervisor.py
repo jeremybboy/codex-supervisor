@@ -18,6 +18,15 @@ class SupervisorTests(unittest.TestCase):
              patch.object(Path, "exists", return_value=True):
             self.assertEqual(supervisor.codex_command(), [supervisor.CODEX_BIN, "app-server", "proxy"])
 
+    def test_passed_run_ready_for_testing_is_a_user_handoff(self):
+        status, needs_user = supervisor.commentary_state(
+            "The final run passed. The app is now launched and ready for you to test."
+        )
+        self.assertEqual((status, needs_user), ("READY FOR REVIEW", "Yes"))
+
+    def test_ordinary_commentary_remains_working(self):
+        self.assertEqual(supervisor.commentary_state("Rebuilding the target now."), ("WORKING", "No"))
+
     def test_commentary_record_is_visible(self):
         record = {"type": "response_item", "payload": {"type": "message", "role": "assistant", "phase": "commentary", "content": [{"type": "output_text", "text": "Building the audio target."}]}}
         self.assertEqual(supervisor.rollout_event(record), ("commentary", "Building the audio target."))

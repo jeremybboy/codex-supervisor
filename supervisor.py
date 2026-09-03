@@ -16,7 +16,7 @@ def find_codex():
 CODEX_BIN=find_codex()
 DEFAULT_CODEX_SOCKET=Path.home()/'.codex'/'app-server-control'/'app-server-control.sock'
 USE_OLLAMA=os.getenv('SUPERVISOR_USE_OLLAMA','0')=='1'
-state={'status':'DISCONNECTED','objective':'Select a Codex task to observe.','currentAction':'','progress':[],'filesChanged':[],'tests':'','lastSuccess':'','blocker':'','scopeDrift':'None','needsUser':'No','nextAction':'','assessment':'','steering':'','events':[],'threads':[],'connected':None,'observedName':'','observedPath':'','lastEvidence':'','lastInterpretation':'','lastAnalysisAt':''}
+state={'status':'DISCONNECTED','objective':'Select a Codex task to observe.','currentAction':'','progress':[],'filesChanged':[],'tests':'','lastSuccess':'','blocker':'','scopeDrift':'None','needsUser':'No','nextAction':'','assessment':'','steering':'','events':[],'threads':[],'connected':None,'observedName':'','observedPath':'','lastEvidence':'','lastInterpretation':'','lastAnalysisAt':'','lastEventAt':''}
 lock=threading.Lock(); rpc_id=0
 analysis_due=0
 analysis_timer=None
@@ -33,6 +33,14 @@ def codex_command():
  command=[CODEX_BIN,'app-server','proxy']
  if configured_socket: command += ['--sock',str(socket_path)]
  return command
+
+def commentary_state(detail):
+ text=' '.join(detail.lower().split())
+ passed=bool(re.search(r'\b(final (?:run|test) passed|all tests passed|completed successfully|task (?:is )?complete|finished successfully)\b',text))
+ handoff=bool(re.search(r'\b(ready (?:for (?:you|user|jeremy) )?(?:to test|for testing|to review|for review)|launched and ready)\b',text))
+ if passed and handoff: return 'READY FOR REVIEW','Yes'
+ if passed: return 'COMPLETE','No'
+ return 'WORKING','No'
 
 def compact_event(kind,detail):
  text=' '.join(str(detail).split())
@@ -77,7 +85,9 @@ def add_event(method,p):
  if key in recent_event_keys[-12:]: return
  recent_event_keys=(recent_event_keys+[key])[-40:]
  with lock:
-  state['events'].insert(0,{'time':time.strftime('%H:%M:%S'),'kind':method,'detail':detail[:1200]})
+  event_time=time.strftime('%H:%M:%S')
+  state['events'].insert(0,{'time':event_time,'kind':method,'detail':detail[:1200]})
+  state['lastEventAt']=event_time
   state['events']=state['events'][:40]
   if method=='turn/started': state['status']='WORKING'; state['currentAction']='A turn is running.'
   if method=='turn/completed': state['status']='COMPLETE'; state['lastSuccess']='Turn completed.'
@@ -87,7 +97,9 @@ def add_event(method,p):
   if method in ('commentary','build/progress','build/poll') or method.startswith('tool/'):
    state['status']='WORKING'
   if method=='commentary':
-   if state['needsUser']=='Yes': state['needsUser']='No'; state['blocker']=''
+   state['status'],state['needsUser']=commentary_state(detail)
+   if state['needsUser']=='No': state['blocker']=''
+   if state['status'] in ('COMPLETE','READY FOR REVIEW'): state['lastSuccess']=detail[:700]
    state['currentAction']=detail[:240]
    state['assessment']='Latest worker update: '+detail[:500]
   elif method=='build/progress': state['currentAction']=detail
@@ -118,7 +130,9 @@ def add_event(method,p):
   if method=='tool/result' and re.search(r'(?im)^(?:Script failed|FAILED|ERROR)(?:[: ].*)?$',str(detail)):
    state['blocker']=f"A failure was reported by {method}; the worker may already be addressing it."
   state['assessment']=f"Evidence-based view: {state['currentAction'] or 'No live worker action is currently observable.'}"
-  state['nextAction']='Continue the current test/change, then verify the result.' if state['status']=='WORKING' else 'Wait for a live worker event or user decision.'
+  if state['status']=='WORKING': state['nextAction']='Continue the current test/change, then verify the result.'
+  elif state['status']=='READY FOR REVIEW': state['nextAction']='Jeremy can test or review the completed result.'
+  else: state['nextAction']='Wait for a live worker event or user decision.'
   analysis_due=time.time()+12
  if USE_OLLAMA:
   if analysis_timer: analysis_timer.cancel()
@@ -206,7 +220,7 @@ def attach(tid):
   analysis_epoch+=1
   if analysis_timer: analysis_timer.cancel(); analysis_timer=None
   recent_event_keys=[]
-  for key,value in {'events':[],'progress':[],'filesChanged':[],'tests':'','lastSuccess':'','blocker':'','currentAction':'','assessment':'','steering':'','lastEvidence':'','lastInterpretation':'','lastAnalysisAt':'','scopeDrift':'None','needsUser':'No'}.items(): state[key]=value
+  for key,value in {'events':[],'progress':[],'filesChanged':[],'tests':'','lastSuccess':'','blocker':'','currentAction':'','assessment':'','steering':'','lastEvidence':'','lastInterpretation':'','lastAnalysisAt':'','lastEventAt':'','scopeDrift':'None','needsUser':'No'}.items(): state[key]=value
   state['connected']=tid; state['observedName']=meta.get('name') or meta.get('title') or tid; state['observedPath']=meta.get('cwd','')
   user=next((i for i in items if i.get('type') in ('userMessage','user_message','message') and (i.get('role') in (None,'user'))),None)
   def text(v):
