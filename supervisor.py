@@ -42,6 +42,14 @@ def commentary_state(detail):
  if passed: return 'COMPLETE','No'
  return 'WORKING','No'
 
+def final_state(detail):
+ text=' '.join(detail.lower().split())
+ handoff=bool(re.search(r'\bready (?:for (?:you|user|jeremy) )?(?:to test|for testing|to review|for review)\b',text))
+ request=bool(re.search(r"\b(blocked|cannot|can't|need you|waiting for|reply|approval required)\b",text))
+ if handoff: return 'READY FOR REVIEW','Yes'
+ if request: return 'WAITING FOR USER','Yes'
+ return 'COMPLETE','No'
+
 def compact_event(kind,detail):
  text=' '.join(str(detail).split())
  if kind=='tool/exec' and 'write_stdin' in text: return ('build/poll','Polled the running build or test process.')
@@ -107,8 +115,9 @@ def add_event(method,p):
   elif method=='worker/final':
    state['currentAction']=detail[:240]
    state['assessment']='Worker conclusion: '+detail[:500]
-   if re.search(r"(?i)\b(blocked|cannot|can't|please|reply|need you|waiting for)\b",detail):
-    state['status']='WAITING FOR USER'; state['needsUser']='Yes'; state['blocker']=detail[:700]
+   state['status'],state['needsUser']=final_state(detail)
+   if state['status']=='WAITING FOR USER': state['blocker']=detail[:700]
+   else: state['blocker']=''; state['lastSuccess']=detail[:700]
   raw=json.dumps(p)
   paths=[]
   def walk(v):

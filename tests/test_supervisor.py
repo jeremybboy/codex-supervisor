@@ -27,6 +27,14 @@ class SupervisorTests(unittest.TestCase):
     def test_ordinary_commentary_remains_working(self):
         self.assertEqual(supervisor.commentary_state("Rebuilding the target now."), ("WORKING", "No"))
 
+    def test_successful_final_answer_is_complete(self):
+        status = supervisor.final_state("Built, signed, and launched the application. All checks passed.")
+        self.assertEqual(status, ("COMPLETE", "No"))
+
+    def test_final_answer_request_waits_for_user(self):
+        status = supervisor.final_state("Testing is blocked. Please connect power, then reply continue.")
+        self.assertEqual(status, ("WAITING FOR USER", "Yes"))
+
     def test_commentary_record_is_visible(self):
         record = {"type": "response_item", "payload": {"type": "message", "role": "assistant", "phase": "commentary", "content": [{"type": "output_text", "text": "Building the audio target."}]}}
         self.assertEqual(supervisor.rollout_event(record), ("commentary", "Building the audio target."))
