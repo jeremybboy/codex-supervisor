@@ -12,6 +12,8 @@ python3 supervisor.py
 
 Open <http://127.0.0.1:8765>, choose a task, and select **Observe**. Captured events remain in memory; Codex Supervisor creates no secondary activity log.
 
+The Codex adapter automatically uses the shared control socket when available and otherwise starts its own read-only stdio app-server. Set `SUPERVISOR_CODEX_TRANSPORT=proxy` or `stdio` only when you need to override that detection.
+
 ![Codex Supervisor observes a local agent feed, filters evidence, and presents a human-readable status without controlling the worker](docs/assets/repository-overview.svg)
 
 Codex Supervisor follows one read-only path: discover a task, observe its existing local feed, discard hidden reasoning and low-value repetition, derive explicit state, then display a concise update. Optional Ollama interpretation is experimental and disabled by default.
