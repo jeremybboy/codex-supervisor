@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codex-supervisor"
+version = "0.1.0"
+description = "A local, read-only dashboard that translates coding-agent activity into human-readable progress."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Jeremy"}]
+keywords = ["codex", "coding-agent", "supervisor", "local-first", "ollama"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+]
+
+[project.scripts]
+codex-supervisor = "supervisor:main"
+
+[tool.setuptools]
+py-modules = ["supervisor"]
+
+[tool.setuptools.data-files]
+"share/codex-supervisor" = ["index.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

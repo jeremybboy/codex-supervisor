@@ -1,0 +1,11 @@
+# Codex Supervisor
+
+> Local read-only coding-agent activity interpreter and browser dashboard.
+
+- README: ./README.md
+- Architecture: ./docs/architecture.md
+- Agent instructions: ./AGENTS.md
+- Contributing: ./CONTRIBUTING.md
+- Security: ./SECURITY.md
+- Source: ./supervisor.py
+- Tests: ./tests/test_supervisor.py
